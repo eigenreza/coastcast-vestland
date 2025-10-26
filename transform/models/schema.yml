@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: stg_water_level
+    description: Hourly observed and astronomical water level from Bergen station BGO.
+    columns:
+      - name: observed_at
+        tests: [not_null, unique]
+      - name: observed_water_level_cm
+        tests: [not_null]
+      - name: tide_cm
+        tests: [not_null]
+  - name: stg_weather
+    description: Hourly historical meteorological covariates at the Bergen gauge coordinates.
+    columns:
+      - name: observed_at
+        tests: [not_null, unique]
+      - name: pressure_msl_hpa
+        tests: [not_null]
+      - name: wind_speed_10m_ms
+        tests: [not_null]
+  - name: int_coastal_hourly
+    description: Joined analytics-ready hourly coastal observations.
+    columns:
+      - name: observed_at
+        tests: [not_null, unique]
+      - name: surge_residual_cm
+        tests: [not_null]
+  - name: mart_daily_conditions
+    description: Daily operational summary for reporting and monitoring.
+    columns:
+      - name: date
+        tests: [not_null, unique]

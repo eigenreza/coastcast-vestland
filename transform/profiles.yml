@@ -1,0 +1,7 @@
+coastcast:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: data/lakehouse.duckdb
+      threads: 4
