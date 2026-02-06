@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "westcentralus" },
+    "appName": { "value": "coastcast-bergen" },
+    "servicePlanName": { "value": "coastcast-bergen-f1" },
+    "containerImage": { "value": "coastcastvestlandeigenreza.azurecr.io/coastcast-vestland:IMAGE_TAG" },
+    "registryName": { "value": "coastcastvestlandeigenreza" },
+    "pullIdentityName": { "value": "coastcast-vestland-pull" }
+  }
+}

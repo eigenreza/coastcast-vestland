@@ -1,0 +1,35 @@
+services:
+  dashboard:
+    build: .
+    command: streamlit run src/coastcast/dashboard/app.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8501:8501"
+    environment:
+      COASTCAST_CONFIG: configs/base.yml
+      COASTCAST_MODEL_DIR: artifacts/runtime
+    volumes:
+      - ./data:/opt/coastcast/data:ro
+      - ./artifacts:/opt/coastcast/artifacts:ro
+
+  api:
+    build: .
+    command: uvicorn coastcast.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      COASTCAST_CONFIG: configs/base.yml
+      COASTCAST_MODEL_DIR: artifacts/runtime
+    volumes:
+      - ./data:/opt/coastcast/data:ro
+      - ./artifacts:/opt/coastcast/artifacts:ro
+
+  pipeline:
+    build: .
+    profiles: ["pipeline"]
+    command: python -m coastcast.cli pipeline --config configs/demo.yml
+    environment:
+      COASTCAST_CONFIG: configs/demo.yml
+    volumes:
+      - ./data:/opt/coastcast/data
+      - ./artifacts:/opt/coastcast/artifacts
+      - ./reports:/opt/coastcast/reports

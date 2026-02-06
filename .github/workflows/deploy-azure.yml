@@ -1,0 +1,76 @@
+name: deploy dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.AZURE_APP_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify deployable runtime assets
+        run: |
+          set -euo pipefail
+          test -f data/gold/features.parquet
+          test -f artifacts/runtime/model_bundle.joblib
+          test -f artifacts/runtime/metrics.json
+          test -f artifacts/runtime/signature.json
+          test -f artifacts/runtime/test_predictions.parquet
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and publish image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOGIN_SERVER="$(az acr show --name "${{ vars.AZURE_ACR_NAME }}" --query loginServer -o tsv)"
+          az acr login --name "${{ vars.AZURE_ACR_NAME }}"
+          IMAGE="${LOGIN_SERVER}/coastcast-vestland:${GITHUB_SHA}-run-${GITHUB_RUN_ID}"
+          docker build --tag "${IMAGE}" .
+          docker push "${IMAGE}"
+          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+      - name: Deploy and verify dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          az webapp config set \
+            --name "${{ vars.AZURE_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --linux-fx-version "DOCKER|${{ steps.image.outputs.image }}" \
+            --output none
+
+          CONFIGURED_IMAGE="$(az webapp config show \
+            --name "${{ vars.AZURE_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query linuxFxVersion \
+            --output tsv)"
+          test "${CONFIGURED_IMAGE}" = "DOCKER|${{ steps.image.outputs.image }}"
+
+          az webapp restart \
+            --name "${{ vars.AZURE_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --output none
+
+          APP_URL="${{ vars.AZURE_APP_URL }}"
+          APP_URL="${APP_URL%/}"
+          for attempt in {1..24}; do
+            if HEALTH="$(curl --fail --show-error --silent --max-time 20 \
+              "${APP_URL}/_stcore/health")" && [[ "${HEALTH}" == "ok" ]]; then
+              exit 0
+            fi
+            if [[ "${attempt}" -eq 24 ]]; then
+              echo "The dashboard did not become healthy at ${APP_URL}."
+              exit 1
+            fi
+            sleep 10
+          done
